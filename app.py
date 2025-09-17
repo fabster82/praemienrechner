@@ -25,7 +25,6 @@ def normalize_tiers(df_tiers: pd.DataFrame) -> pd.DataFrame:
         df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
     df["eur_pro_punkt"] = pd.to_numeric(df.get("eur_pro_punkt", np.nan), errors="coerce")
     df = df.dropna(subset=["von_platz", "bis_platz", "eur_pro_punkt"]).reset_index(drop=True)
-    # ensure von <= bis
     df = df[df["von_platz"] <= df["bis_platz"]]
     return df.sort_values(["von_platz", "bis_platz"]).reset_index(drop=True)
 
@@ -106,19 +105,34 @@ def compute_scenarios(df_scen: pd.DataFrame, tiers: pd.DataFrame, base_rate: flo
 def df_to_csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False, sep=";").encode("utf-8-sig")
 
+# ---------- Deine Standardwerte ----------
+DEFAULT_BASE_RATE = 50.0
+DEFAULT_TIERS = pd.DataFrame({
+    # ab Platz 3 -> 100 €/Punkt (3–6), ab Platz 7 -> 75 €/Punkt (7–999)
+    "von_platz": [3, 7],
+    "bis_platz": [6, 999],
+    "eur_pro_punkt": [100, 75],
+})
+DEFAULT_PROMOS = pd.DataFrame({
+    # Aufstiegsprämie 500 € für Platz 1–2
+    "von_platz": [1],
+    "bis_platz": [2],
+    "bonus_eur": [500],
+})
+DEFAULT_SCENARIOS = pd.DataFrame({
+    "Platz":  [1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16],
+    "Punkte": [73, 69, 67, 59, 51, 46, 35, 35, 32, 32, 31, 26, 23, 19, 11, 11],
+})
+
 # ---------- Defaults in Session ----------
 if "tiers" not in st.session_state:
-    st.session_state.tiers = pd.DataFrame(
-        {"von_platz": [1, 7], "bis_platz": [3, 15], "eur_pro_punkt": [100, 75]}
-    )
+    st.session_state.tiers = DEFAULT_TIERS.copy()
 if "promos" not in st.session_state:
-    st.session_state.promos = pd.DataFrame(
-        {"von_platz": [1], "bis_platz": [2], "bonus_eur": [500]}
-    )
+    st.session_state.promos = DEFAULT_PROMOS.copy()
 if "base_rate" not in st.session_state:
-    st.session_state.base_rate = 50.0
+    st.session_state.base_rate = DEFAULT_BASE_RATE
 if "scenarios" not in st.session_state:
-    st.session_state.scenarios = pd.DataFrame({"Platz": [1, 2, 3, 7, 10, 16], "Punkte": [80, 75, 70, 60, 55, 40]})
+    st.session_state.scenarios = DEFAULT_SCENARIOS.copy()
 
 # ---------- UI ----------
 st.title("⚽ Prämien-Rechner Fußball")
@@ -126,6 +140,13 @@ st.caption("Platz-basierte €/Punkt-Stufen + Aufstiegsbonus. Ergebnisse je Szen
 
 with st.sidebar:
     st.header("⚙️ Variablen")
+    if st.button("🔄 Standardwerte laden"):
+        st.session_state.tiers = DEFAULT_TIERS.copy()
+        st.session_state.promos = DEFAULT_PROMOS.copy()
+        st.session_state.base_rate = DEFAULT_BASE_RATE
+        st.session_state.scenarios = DEFAULT_SCENARIOS.copy()
+        st.success("Standardwerte gesetzt.")
+
     st.session_state.base_rate = st.number_input(
         "Basis-€ pro Punkt (Rest)", min_value=0.0, step=5.0, value=float(st.session_state.base_rate)
     )
