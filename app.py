@@ -239,16 +239,7 @@ result_df = compute_scenarios(
 )
 st.dataframe(result_df, use_container_width=True)
 
-csv_bytes = df_to_csv_download(result_df, "praemien_ergebnis.csv")
-st.download_button("⬇️ Ergebnisse als CSV (;) herunterladen", data=csv_bytes, file_name="praemien_ergebnis.csv", mime="text/csv")
-
-# Summary KPIs
+# ---- Nur Ø €/Punkt als kleines KPI-Signal (die anderen beiden wurden entfernt) ----
 if not result_df.empty:
-    total_cost = float(result_df["Gesamt-Prämie (€)"].sum())
     avg_rate = float(result_df["€/Punkt"].mean())
-    n_rows = len(result_df)
-    k1, k2, k3 = st.columns(3)
-    # einfache EU-Formatierung
-    k1.metric("Gesamtkosten aller Szenarien (€)", f"{total_cost:,.2f}".replace(",", " ").replace(".", ","))
-    k2.metric("Ø €/Punkt", f"{avg_rate:,.2f}".replace(",", " ").replace(".", ","))
-    k3.metric("Anzahl Szenarien", f"{n_rows}")
+    st.metric("Ø €/Punkt", f"{avg_rate:,.2f}".replace(",", " ").replace(".", ","))
