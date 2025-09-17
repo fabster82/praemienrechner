@@ -108,9 +108,9 @@ def df_to_csv_download(df: pd.DataFrame, filename: str) -> bytes:
 # ---------- Deine Standardwerte ----------
 DEFAULT_BASE_RATE = 50.0
 DEFAULT_TIERS = pd.DataFrame({
-    # ab Platz 3 -> 100 €/Punkt (3–6), ab Platz 7 -> 75 €/Punkt (7–999)
-    "von_platz": [3, 7],
-    "bis_platz": [6, 999],
+    # 1–3 -> 100 €/Punkt, 4–6 -> 75 €/Punkt, Rest -> Basis (50 €)
+    "von_platz": [1, 4],
+    "bis_platz": [3, 6],
     "eur_pro_punkt": [100, 75],
 })
 DEFAULT_PROMOS = pd.DataFrame({
@@ -140,7 +140,8 @@ st.caption("Platz-basierte €/Punkt-Stufen + Aufstiegsbonus. Ergebnisse je Szen
 
 with st.sidebar:
     st.header("⚙️ Variablen")
-    if st.button("🔄 Standardwerte laden"):
+    # Standardwerte-Laden
+    if st.button("🔄 Standardwerte laden", key="btn_defaults"):
         st.session_state.tiers = DEFAULT_TIERS.copy()
         st.session_state.promos = DEFAULT_PROMOS.copy()
         st.session_state.base_rate = DEFAULT_BASE_RATE
@@ -148,22 +149,29 @@ with st.sidebar:
         st.success("Standardwerte gesetzt.")
 
     st.session_state.base_rate = st.number_input(
-        "Basis-€ pro Punkt (Rest)", min_value=0.0, step=5.0, value=float(st.session_state.base_rate)
+        "Basis-€ pro Punkt (Rest)",
+        min_value=0.0,
+        step=5.0,
+        value=float(st.session_state.base_rate),
+        key="base_rate_input",
     )
     tier_mode = st.selectbox(
         "Tier-Match bei Überlappungen",
         ["first", "max_range"],
+        index=0,
+        key="tier_mode",
         help="Wie bei überlappenden Platz-Bereichen entschieden wird."
     )
     promo_mode = st.selectbox(
         "Bonus-Modus",
         ["first", "max", "sum"],
         index=0,
+        key="promo_mode",
         help="Wenn mehrere Bonus-Bereiche greifen."
     )
     st.markdown("---")
     st.write("📥 **Szenarien per CSV (optional)** – Spalten: `Platz;Punkte`")
-    up = st.file_uploader("CSV hochladen", type=["csv"])
+    up = st.file_uploader("CSV hochladen", type=["csv"], key="csv_upload")
     if up:
         try:
             df_up = pd.read_csv(up, sep=None, engine="python")
@@ -179,6 +187,7 @@ with col1:
     st.info("Nicht abgedeckte Plätze nutzen den Basis-Wert.")
     tiers_edit = st.data_editor(
         st.session_state.tiers,
+        key="tiers_editor",
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -192,6 +201,7 @@ with col2:
     st.info("Du kannst auch mehrere Bereiche definieren (z. B. 1–2 und 1–3).")
     promos_edit = st.data_editor(
         st.session_state.promos,
+        key="promos_editor",
         num_rows="dynamic",
         use_container_width=True,
         column_config={
@@ -201,6 +211,7 @@ with col2:
         }
     )
 
+# Übernehmen & normalisieren
 st.session_state.tiers = normalize_tiers(tiers_edit)
 st.session_state.promos = normalize_promos(promos_edit)
 
@@ -208,6 +219,7 @@ st.subheader("📝 Szenarien (Platz + Punkte)")
 st.caption("Trage beliebige Kombinationen ein. Ergebnis wird unten berechnet.")
 scen_edit = st.data_editor(
     st.session_state.scenarios,
+    key="scenarios_editor",
     num_rows="dynamic",
     use_container_width=True,
     column_config={
@@ -216,6 +228,11 @@ scen_edit = st.data_editor(
     }
 )
 st.session_state.scenarios = scen_edit
+
+# Optionaler Aktualisieren-Button (erzwingt eine frische Berechnung)
+force_update = st.button("🔁 Aktualisieren", type="primary", use_container_width=False, key="btn_update")
+if force_update:
+    st.rerun()
 
 # Validation warnings
 warns = []
@@ -234,12 +251,12 @@ result_df = compute_scenarios(
     st.session_state.tiers,
     st.session_state.base_rate,
     st.session_state.promos,
-    promo_mode=promo_mode,
-    tier_mode=tier_mode,
+    promo_mode=st.session_state.get("promo_mode", "first"),
+    tier_mode=st.session_state.get("tier_mode", "first"),
 )
 st.dataframe(result_df, use_container_width=True)
 
-# ---- Nur Ø €/Punkt als kleines KPI-Signal (die anderen beiden wurden entfernt) ----
+# Nur Ø €/Punkt als KPI
 if not result_df.empty:
     avg_rate = float(result_df["€/Punkt"].mean())
     st.metric("Ø €/Punkt", f"{avg_rate:,.2f}".replace(",", " ").replace(".", ","))
