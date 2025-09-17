@@ -106,15 +106,15 @@ def df_to_csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False, sep=";").encode("utf-8-sig")
 
 # ---------- Deine Standardwerte ----------
-DEFAULT_BASE_RATE = 50.0
+DEFAULT_BASE_RATE = 35.0  # Rest nach Platz 10
 DEFAULT_TIERS = pd.DataFrame({
-    # 1–3 -> 100 €/Punkt, 4–6 -> 75 €/Punkt, Rest -> Basis (50 €)
-    "von_platz": [1, 4],
-    "bis_platz": [3, 6],
-    "eur_pro_punkt": [100, 75],
+    # 1–2 -> 100 €/Punkt, 3–5 -> 75 €/Punkt, 6–10 -> 50 €/Punkt, Rest -> Basis (35 €)
+    "von_platz":   [1, 3, 6],
+    "bis_platz":   [2, 5, 10],
+    "eur_pro_punkt":[100, 75, 50],
 })
 DEFAULT_PROMOS = pd.DataFrame({
-    # Aufstiegsprämie 500 € für Platz 1–2
+    # Aufstiegsprämie 500 € für Platz 1–2 (editierbar in der App)
     "von_platz": [1],
     "bis_platz": [2],
     "bonus_eur": [500],
@@ -151,9 +151,10 @@ with st.sidebar:
     st.session_state.base_rate = st.number_input(
         "Basis-€ pro Punkt (Rest)",
         min_value=0.0,
-        step=5.0,
+        step=1.0,
         value=float(st.session_state.base_rate),
         key="base_rate_input",
+        help="Gilt für alle Plätze, die in den Stufen nicht abgedeckt sind (hier: >10)."
     )
     tier_mode = st.selectbox(
         "Tier-Match bei Überlappungen",
@@ -184,7 +185,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("📊 Stufen (Von/Bis → €/Punkt)")
-    st.info("Nicht abgedeckte Plätze nutzen den Basis-Wert.")
+    st.info("Nicht abgedeckte Plätze nutzen den Basis-Wert (Sidebar).")
     tiers_edit = st.data_editor(
         st.session_state.tiers,
         key="tiers_editor",
@@ -193,7 +194,7 @@ with col1:
         column_config={
             "von_platz": st.column_config.NumberColumn("Von Platz", min_value=1, step=1),
             "bis_platz": st.column_config.NumberColumn("Bis Platz", min_value=1, step=1),
-            "eur_pro_punkt": st.column_config.NumberColumn("€ pro Punkt", min_value=0.0, step=5.0, format="%.2f"),
+            "eur_pro_punkt": st.column_config.NumberColumn("€ pro Punkt", min_value=0.0, step=1.0, format="%.2f"),
         }
     )
 with col2:
