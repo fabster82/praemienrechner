@@ -82,16 +82,16 @@ def df_to_csv_download(df: pd.DataFrame, filename: str) -> bytes:
 # ---------- Standardwerte (aktuell) ----------
 # €/Punkt: 1–2 -> 75, 3–5 -> 50, 6–10 -> 35, Rest -> 25
 # Bonus: Platz 1 -> 2500, Platz 2 -> 2000
-DEFAULT_BASE_RATE = 20.0
+DEFAULT_BASE_RATE = 10.0
 DEFAULT_TIERS = pd.DataFrame({
     "von_platz":   [1, 3, 6],
     "bis_platz":   [2, 5, 10],
-    "eur_pro_punkt":[60, 40, 25],
+    "eur_pro_punkt":[30, 20, 15],
 })
 DEFAULT_PROMOS = pd.DataFrame({
     "von_platz": [1, 2],
     "bis_platz": [1, 2],
-    "bonus_eur": [2500, 2000],
+    "bonus_eur": [500, 250],
 })
 DEFAULT_SCENARIOS = pd.DataFrame({
     "Platz":  [1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16],
@@ -218,5 +218,6 @@ if not result_df.empty:
 # CSV-Export
 csv_bytes = df_to_csv_download(result_df, "praemien_ergebnis.csv")
 st.download_button("⬇️ Ergebnisse als CSV (;) herunterladen", data=csv_bytes, file_name="praemien_ergebnis.csv", mime="text/csv")
+
 
 
