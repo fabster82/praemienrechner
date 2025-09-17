@@ -1,16 +1,6 @@
-import io
-from typing import List, Tuple
-from datetime import datetime
-
-import numpy as np
 import pandas as pd
 import streamlit as st
-
-# PDF (reines Python – läuft auf Streamlit Cloud)
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+import numpy as np  # optional, aber praktisch für spätere Erweiterungen
 
 st.set_page_config(page_title="Prämien-Rechner Fußball", page_icon="⚽", layout="wide")
 
@@ -89,95 +79,7 @@ def compute_scenarios(df_scen: pd.DataFrame, tiers: pd.DataFrame, base_rate: flo
 def df_to_csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False, sep=";").encode("utf-8-sig")
 
-# ---------- PDF ----------
-def build_pdf_bytes(result_df: pd.DataFrame, tiers: pd.DataFrame, promos: pd.DataFrame, base_rate: float) -> bytes:
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf, pagesize=A4, rightMargin=24, leftMargin=24, topMargin=28, bottomMargin=28
-    )
-    styles = getSampleStyleSheet()
-    story = []
-
-    # Titel
-    title = Paragraph("⚽ Prämien-Rechner – Auswertung", styles["Title"])
-    ts = datetime.now().strftime("%d.%m.%Y %H:%M")
-    subtitle = Paragraph(f"Stand: {ts}", styles["Normal"])
-    story.extend([title, subtitle, Spacer(1, 10)])
-
-    # Variablen
-    story.append(Paragraph("<b>Variablen</b>", styles["Heading3"]))
-    var_tbl = Table([
-        ["Basis-€ pro Punkt (Rest)", f"{base_rate:,.2f}".replace(",", " ").replace(".", ",")],
-    ], colWidths=[220, 140])
-    var_tbl.setStyle(TableStyle([
-        ("BOX", (0,0), (-1,-1), 0.5, colors.black),
-        ("INNERGRID", (0,0), (-1,-1), 0.25, colors.grey),
-        ("BACKGROUND", (0,0), (0,0), colors.whitesmoke),
-    ]))
-    story.extend([var_tbl, Spacer(1, 8)])
-
-    # Stufen
-    story.append(Paragraph("<b>Stufen (€/Punkt)</b>", styles["Heading3"]))
-    tiers_display = tiers.copy()
-    tiers_display = tiers_display.rename(columns={"von_platz":"Von Platz","bis_platz":"Bis Platz","eur_pro_punkt":"€ pro Punkt"})
-    tiers_data = [list(tiers_display.columns)] + [[int(r["Von Platz"]), int(r["Bis Platz"]), f'{float(r["€ pro Punkt"]):,.2f}'.replace(",", " ").replace(".", ",")] for _, r in tiers_display.iterrows()]
-    if tiers_data:
-        t_tbl = Table(tiers_data, colWidths=[80, 80, 120])
-        t_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#F0F0F0")),
-            ("TEXTCOLOR", (0,0), (-1,0), colors.black),
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ]))
-        story.append(t_tbl)
-    story.append(Paragraph(f"Nicht abgedeckte Plätze: Basis {base_rate:,.2f} € / Punkt".replace(",", " ").replace(".", ","), styles["Italic"]))
-    story.append(Spacer(1, 8))
-
-    # Bonus
-    story.append(Paragraph("<b>Aufstiegsbonus</b>", styles["Heading3"]))
-    promos_display = promos.copy().rename(columns={"von_platz":"Von Platz","bis_platz":"Bis Platz","bonus_eur":"Bonus (€)"})
-    promo_data = [list(promos_display.columns)] + [[int(r["Von Platz"]), int(r["Bis Platz"]), f'{float(r["Bonus (€)"]):,.2f}'.replace(",", " ").replace(".", ",")] for _, r in promos_display.iterrows()]
-    if promo_data:
-        p_tbl = Table(promo_data, colWidths=[80, 80, 120])
-        p_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#F0F0F0")),
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-        ]))
-        story.append(p_tbl)
-    story.append(Spacer(1, 10))
-
-    # Ergebnisse
-    story.append(Paragraph("<b>Ergebnisse (Szenarien)</b>", styles["Heading3"]))
-    if result_df is None or result_df.empty:
-        story.append(Paragraph("Keine Szenarien vorhanden.", styles["Normal"]))
-    else:
-        df_disp = result_df.copy()
-        # Formatierung
-        for col in ["€/Punkt", "Aufstiegsbonus (€)", "Gesamt-Prämie (€)"]:
-            df_disp[col] = df_disp[col].map(lambda x: f"{float(x):,.2f}".replace(",", " ").replace(".", ","))
-
-        data = [list(["Platz","Punkte","€/Punkt","Aufstiegsbonus (€)","Gesamt-Prämie (€)"])]
-        data += df_disp[["platz","punkte","€/Punkt","Aufstiegsbonus (€)","Gesamt-Prämie (€)"]].values.tolist()
-
-        widths = [60, 60, 90, 120, 120]
-        r_tbl = Table(data, colWidths=widths, repeatRows=1)
-        r_tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#DDEBF7")),
-            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
-            ("ALIGN", (0,0), (-1,-1), "CENTER"),
-            ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
-        ]))
-        story.append(r_tbl)
-
-    doc.build(story)
-    pdf_bytes = buf.getvalue()
-    buf.close()
-    return pdf_bytes
-
-# ---------- Standardwerte (deine aktuellen Defaults) ----------
+# ---------- Standardwerte (aktuell) ----------
 # €/Punkt: 1–2 -> 75, 3–5 -> 50, 6–10 -> 35, Rest -> 25
 # Bonus: Platz 1 -> 2500, Platz 2 -> 2000
 DEFAULT_BASE_RATE = 25.0
@@ -308,23 +210,11 @@ result_df = compute_scenarios(
 )
 st.dataframe(result_df, use_container_width=True)
 
-# Ø €/Punkt (leichtes KPI)
+# nur Ø €/Punkt (die anderen KPIs sind entfernt)
 if not result_df.empty:
     avg_rate = float(result_df["€/Punkt"].mean())
     st.metric("Ø €/Punkt", f"{avg_rate:,.2f}".replace(",", " ").replace(".", ","))
 
-# ---- PDF-Download ----
-st.markdown("### 📄 Export")
-pdf_bytes = build_pdf_bytes(
-    result_df=result_df,
-    tiers=st.session_state.tiers,
-    promos=st.session_state.promos,
-    base_rate=float(st.session_state.base_rate),
-)
-st.download_button(
-    "PDF herunterladen",
-    data=pdf_bytes,
-    file_name="praemien_ergebnis.pdf",
-    mime="application/pdf",
-    use_container_width=False,
-)
+# CSV-Export
+csv_bytes = df_to_csv_download(result_df, "praemien_ergebnis.csv")
+st.download_button("⬇️ Ergebnisse als CSV (;) herunterladen", data=csv_bytes, file_name="praemien_ergebnis.csv", mime="text/csv")
